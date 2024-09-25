@@ -1,3 +1,4 @@
+import Vue from 'vue'
 import { nextTick } from 'core/util'
 import {
   watch,
@@ -278,5 +279,40 @@ describe('reactivity/effectScope', () => {
 
       expect(getCurrentScope()).toBe(currentScope)
     })
+  })
+
+  it('calling .off() of a detached scope inside an active scope should not break currentScope', () => {
+    const parentScope = new EffectScope()
+
+    parentScope.run(() => {
+      const childScope = new EffectScope(true)
+      childScope.on()
+      childScope.off()
+      expect(getCurrentScope()).toBe(parentScope)
+    })
+  })
+
+  it('scope should not break currentScope when component call hooks', () => {
+    const scope = new EffectScope()
+    const vm = new Vue({
+      template: `
+          <div>
+            <div v-if="show" />
+          </div>
+        `,
+      data() {
+        return {
+          show: false
+        }
+      }
+    }).$mount()
+
+    scope.run(() => {
+      // call renderTriggered hook here
+      vm.show = true
+      // this effect should be collected by scope not the component scope
+      effect(() => {})
+    })
+    expect(scope.effects.length).toBe(1)
   })
 })
